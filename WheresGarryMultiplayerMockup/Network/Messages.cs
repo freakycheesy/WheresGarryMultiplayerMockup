@@ -10,8 +10,11 @@ namespace WheresGarryMultiplayerMockup.Network
         PlayerLeft,
         PlayerState,
         FixError,
+        FixServer,
         ControllerState,
         NpcState,
+        Died,
+        AllDied,
     }
     public struct PlayerJoinMessage : IMessageSerializable
     {
@@ -93,8 +96,7 @@ namespace WheresGarryMultiplayerMockup.Network
     }
     public struct ControllerStateMessage : IMessageSerializable
     {
-        public static Controller controller => Core.controller;
-
+        public Controller controller => Core.controller;
         public void Deserialize(Message message)
         {
             controller.timer = message.GetFloat();

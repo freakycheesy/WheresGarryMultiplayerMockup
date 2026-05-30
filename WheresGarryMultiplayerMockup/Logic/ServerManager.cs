@@ -11,12 +11,21 @@ namespace WheresGarryMultiplayerMockup.Logic
 {
     public static class ServerManager
     {
+        public static int dead = 0;
         public static List<int> fixedErrors = new();
         public static List<int> fixedServers = new();
         public static void Start()
         {
+            Core.onSceneCached += OnSceneCached;
             NetworkManager.server.ClientConnected += HandlePlayerJoin;
             NetworkManager.server.ClientDisconnected += HandlePlayerLeaving;
+        }
+
+        private static void OnSceneCached()
+        {
+            dead = 0;
+            fixedErrors.Clear();
+            fixedServers.Clear();
         }
 
         private static void HandlePlayerJoin(object sender, Riptide.ServerConnectedEventArgs e)
@@ -67,41 +76,86 @@ namespace WheresGarryMultiplayerMockup.Logic
         [MessageHandler((ushort)Messages.FixError)]
         public static void HandleFixErrors(ushort sender, Message incoming)
         {
-            if (sender != NetworkManager.client.Id) Core.controller.Fix();
+            FixCode(sender, incoming, Messages.FixError);
+        }
+        [MessageHandler((ushort)Messages.FixServer)]
+        public static void HandleFixServers(ushort sender, Message incoming)
+        {
+            FixCode(sender, incoming, Messages.FixServer);
+        }
+
+        private static void FixCode(ushort sender, Message incoming, Messages messageId)
+        {
+            if (sender != NetworkManager.client.Id)
+            {
+                Core.controller.Fix();
+            }
             var message = incoming.GetSerializable<FixMessage>();
-            Message outgoing = Message.Create(MessageSendMode.Reliable, Messages.FixError);
+            Message outgoing = Message.Create(MessageSendMode.Reliable, messageId);
             outgoing.Add(message);
             NetworkManager.server.SendToAll(outgoing, sender);
         }
 
-        public static void Update()
+        [MessageHandler((ushort)Messages.Died)]
+        public static void HandleDeath(ushort sender, Message incoming)
         {
-            SendControllerState();/*
-            for (int i = 0; i < Core.agents.Length; i++)
+            dead++;
+            if (sender == NetworkManager.client.Id)
             {
-                SendNpcState(i, Core.agents[i]);
-            }*/
+                ClientManager.localPlayer.transform.position = Vector3.up * 500;
+                ClientManager.localPlayer.gameObject.SetActive(false);
+            }
+            else
+            {
+                ClientManager.players.Remove(sender);
+            }
+            if (dead >= NetworkManager.server.ClientCount + 1)
+            {
+                Message outgoing = Message.Create(MessageSendMode.Reliable, Messages.AllDied);
+                NetworkManager.server.SendToAll(outgoing);
+            }
         }
 
-        private static void SendNpcState(int id, NavMeshAgent agent)
+
+        public static void Update()
         {
-            if (agent == null) return;
-            Message outgoing = Message.Create(MessageSendMode.Unreliable, Messages.NpcState);
-            ushort closest = 0;
-            foreach(var player in ClientManager.players)
+            SendControllerState();
+            if (Core.controller)
             {
-                if (Vector3.Distance(player.Value.transform.position, agent.transform.position) < Vector3.Distance(ClientManager.players[closest].transform.position, agent.transform.position))
+                for (int i = 0; i < Core.enemies.Length; i++)
                 {
-                    closest = player.Key;
+                    SendNpcState(i);
                 }
             }
-            agent.SetDestination(ClientManager.players[closest].transform.position);
+        }
+
+        private static void SendNpcState(int id)
+        {
+            var npc = Core.enemies[id];
+            if (npc == null) return;
+            Transform closest = ClientManager.players[0].transform;
+            foreach (var player in ClientManager.players.Values)
+            {
+                if (Vector3.Distance(player.transform.position, npc.transform.position) < Vector3.Distance(closest.transform.position, npc.transform.position))
+                {
+                    closest = player.transform;
+                }
+            }
+            if (npc.TryGetComponent(out Enemy enemy))
+            {
+                typeof(Enemy).GetField("player").SetValue(enemy, closest.GetComponent<Player>());
+            }
+            else if (npc.TryGetComponent(out PuppetNPC puppet))
+            {
+                typeof(PuppetNPC).GetField("player").SetValue(puppet, closest.GetComponent<Player>());
+            }
             NpcStateMessage message = new()
             {
                 id = id,
-                position = agent.transform.position,
-                rotation = agent.transform.rotation,
+                position = npc.transform.position,
+                rotation = npc.transform.rotation,
             };
+            Message outgoing = Message.Create(MessageSendMode.Unreliable, Messages.NpcState);
             outgoing.Add(message);
             NetworkManager.server.SendToAll(outgoing, NetworkManager.client.Id);
         }

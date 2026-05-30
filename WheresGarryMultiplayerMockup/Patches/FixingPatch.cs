@@ -8,13 +8,13 @@ using WheresGarryMultiplayerMockup.Network;
 
 namespace WheresGarryMultiplayerMockup.Patches
 {
-    internal class FixingPatch
+    [HarmonyPatch]
+    public static class FixingPatch
     {
-        public static List<Error> errors = new List<Error>();
         [HarmonyPatch(typeof(Error), "Start"), HarmonyPostfix]
         public static void StartPatch(Error __instance)
         {
-            errors.Add(__instance);
+            Core.errors.Add(__instance);
         }
         [HarmonyPatch(typeof(Error), "Fixed"), HarmonyPostfix]
         public static void FixedPatch(Error __instance)
@@ -22,9 +22,27 @@ namespace WheresGarryMultiplayerMockup.Patches
             if (!NetworkManager.isRunning) return;
             FixMessage message = new FixMessage()
             {
-                id = errors.IndexOf(__instance),
+                id = Core.errors.IndexOf(__instance),
             };
             Message outgoing = Message.Create(MessageSendMode.Reliable, Messages.FixError);
+            outgoing.Add(message);
+            NetworkManager.client.Send(outgoing);
+        }
+
+        [HarmonyPatch(typeof(Server), "Start"), HarmonyPostfix]
+        public static void StartPatch(Server __instance)
+        {
+            Core.servers.Add(__instance);
+        }
+        [HarmonyPatch(typeof(Server), "OnTriggerEnter"), HarmonyPostfix]
+        public static void FixedPatch(Server __instance, Collider collision)
+        {
+            if (!NetworkManager.isRunning) return;
+            FixMessage message = new FixMessage()
+            {
+                id = Core.servers.IndexOf(__instance),
+            };
+            Message outgoing = Message.Create(MessageSendMode.Reliable, Messages.FixServer);
             outgoing.Add(message);
             NetworkManager.client.Send(outgoing);
         }

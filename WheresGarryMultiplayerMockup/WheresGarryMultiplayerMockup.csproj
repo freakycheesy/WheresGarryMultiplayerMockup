@@ -296,6 +296,8 @@
 		<Compile Include="Network\NetworkManager.cs" />
 		<Compile Include="Network\NetworkGUI.cs" />
 		<Compile Include="Network\NetworkSettings.cs" />
+		<Compile Include="Patches\ControllerPatch.cs" />
+		<Compile Include="Patches\EnemyPatch.cs" />
 		<Compile Include="Patches\FixingPatch.cs" />
 		<Content Include="Directory.Build.props" />
 	</ItemGroup>

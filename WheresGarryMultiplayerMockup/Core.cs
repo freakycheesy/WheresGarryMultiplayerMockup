@@ -14,10 +14,14 @@ namespace WheresGarryMultiplayerMockup
 {
     public class Core : MelonMod
     {
-        public static NavMeshAgent[] agents => GameObject.FindObjectsByType<NavMeshAgent>(FindObjectsInactive.Include,FindObjectsSortMode.None);
-        public static Controller controller => GameObject.FindAnyObjectByType<Controller>(FindObjectsInactive.Include);
+        public static LemonAction onSceneCached;
+        public static Controller controller;
+        public static GameObject[] enemies => GameObject.FindGameObjectsWithTag("Enemy");
+        public static List<Error> errors = new();
+        public static List<Server> servers = new();
         public override void OnInitializeMelon()
         {
+            onSceneCached += OnSceneCached;
             LoggerInstance.Msg("Initialized.");
             HarmonyInstance.PatchAll();
             string path = Path.Combine(MelonEnvironment.UserDataDirectory, "networkSettings.json");
@@ -37,6 +41,12 @@ namespace WheresGarryMultiplayerMockup
             NetworkManager.clientUpdate += ClientManager.Update;
             ServerManager.Start();
             ClientManager.Start();
+        }
+
+        private void OnSceneCached()
+        {
+            errors.Clear();
+            servers.Clear();
         }
 
         private void Update()
