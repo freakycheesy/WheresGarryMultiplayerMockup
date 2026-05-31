@@ -1,19 +1,16 @@
 ﻿using MelonLoader;
 using Riptide;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using Riptide.Transports;
 using UnityEngine;
-using UnityEngine.AI;
 using WheresGarryMultiplayerMockup.Network;
 
 namespace WheresGarryMultiplayerMockup.Logic
 {
     public static class ServerManager
     {
-        public static int dead = 0;
         public static List<int> fixedErrors = new();
         public static List<int> fixedServers = new();
+        public static List<ushort> deadPlayers = new();
         public static void Start()
         {
             Core.onSceneCached += OnSceneCached;
@@ -23,7 +20,7 @@ namespace WheresGarryMultiplayerMockup.Logic
 
         private static void OnSceneCached()
         {
-            dead = 0;
+            deadPlayers.Clear();
             fixedErrors.Clear();
             fixedServers.Clear();
         }
@@ -42,13 +39,34 @@ namespace WheresGarryMultiplayerMockup.Logic
             {
                 if (client.Id == e.Client.Id)
                     continue;
-                Message outgoing2 = Message.Create(MessageSendMode.Reliable, Messages.PlayerJoin);
+                outgoing = Message.Create(MessageSendMode.Reliable, Messages.PlayerJoin);
                 PlayerJoinMessage message2 = new()
                 {
                     id = client.Id
                 };
-                outgoing2.Add(message2);
-                NetworkManager.server.Send(outgoing2, e.Client.Id);
+                outgoing.Add(message2);
+                NetworkManager.server.Send(outgoing, e.Client.Id);
+            }
+
+            foreach(var error in fixedErrors)
+            {
+                FixMessage message2 = new()
+                {
+                    id = error
+                };
+                outgoing = Message.Create(MessageSendMode.Reliable, Messages.FixError);
+                outgoing.Add(message);
+                NetworkManager.server.Send(outgoing, e.Client.Id);
+            }
+            foreach (var server in fixedServers)
+            {
+                FixMessage message2 = new()
+                {
+                    id = server
+                };
+                outgoing = Message.Create(MessageSendMode.Reliable, Messages.FixServer);
+                outgoing.Add(message);
+                NetworkManager.server.Send(outgoing, e.Client.Id);
             }
         }
         private static void HandlePlayerLeaving(object sender, ServerDisconnectedEventArgs e)
@@ -60,6 +78,11 @@ namespace WheresGarryMultiplayerMockup.Logic
             };
             outgoing.Add(message);
             NetworkManager.server.SendToAll(outgoing);
+            if (deadPlayers.Count >= NetworkManager.server.ClientCount)
+            {
+                outgoing = Message.Create(MessageSendMode.Reliable, Messages.AllDied);
+                NetworkManager.server.SendToAll(outgoing);
+            }
         }
 
 
@@ -86,20 +109,27 @@ namespace WheresGarryMultiplayerMockup.Logic
 
         private static void FixCode(ushort sender, Message incoming, Messages messageId)
         {
-            if (sender != NetworkManager.client.Id)
-            {
-                Core.controller.Fix();
-            }
+            Core.controller.Fix();
             var message = incoming.GetSerializable<FixMessage>();
             Message outgoing = Message.Create(MessageSendMode.Reliable, messageId);
             outgoing.Add(message);
-            NetworkManager.server.SendToAll(outgoing, sender);
+            switch (messageId)
+            {
+                case Messages.FixError:
+                    fixedErrors.Add(message.id);
+                    break;
+                case Messages.FixServer:
+                    fixedServers.Add(message.id);
+                    break;
+            }
+            NetworkManager.server.SendToAll(outgoing);
         }
 
         [MessageHandler((ushort)Messages.Died)]
         public static void HandleDeath(ushort sender, Message incoming)
         {
-            dead++;
+            MelonLogger.Msg("Received Dead Message");
+            if(!deadPlayers.Contains(sender)) deadPlayers.Add(sender);
             if (sender == NetworkManager.client.Id)
             {
                 ClientManager.localPlayer.transform.position = Vector3.up * 500;
@@ -108,8 +138,8 @@ namespace WheresGarryMultiplayerMockup.Logic
             else
             {
                 ClientManager.players.Remove(sender);
-            }
-            if (dead >= NetworkManager.server.ClientCount + 1)
+            }        
+            if (deadPlayers.Count >= NetworkManager.server.ClientCount)
             {
                 Message outgoing = Message.Create(MessageSendMode.Reliable, Messages.AllDied);
                 NetworkManager.server.SendToAll(outgoing);
@@ -120,6 +150,7 @@ namespace WheresGarryMultiplayerMockup.Logic
         public static void Update()
         {
             SendControllerState();
+            /*
             if (Core.controller)
             {
                 for (int i = 0; i < Core.enemies.Length; i++)
@@ -127,8 +158,9 @@ namespace WheresGarryMultiplayerMockup.Logic
                     SendNpcState(i);
                 }
             }
+            */
         }
-
+        /*
         private static void SendNpcState(int id)
         {
             var npc = Core.enemies[id];
@@ -158,7 +190,7 @@ namespace WheresGarryMultiplayerMockup.Logic
             Message outgoing = Message.Create(MessageSendMode.Unreliable, Messages.NpcState);
             outgoing.Add(message);
             NetworkManager.server.SendToAll(outgoing, NetworkManager.client.Id);
-        }
+        }*/
 
         private static void SendControllerState()
         {

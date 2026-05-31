@@ -9,5 +9,6 @@ namespace WheresGarryMultiplayerMockup.Network
     {
         public ushort port;
         public ushort maxConnections;
+        public string username;
     }
 }

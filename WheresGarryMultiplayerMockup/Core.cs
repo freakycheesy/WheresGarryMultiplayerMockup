@@ -1,5 +1,6 @@
 ﻿using MelonLoader;
 using MelonLoader.Utils;
+using Riptide;
 using Riptide.Utils;
 using UnityEngine;
 using UnityEngine.AI;
@@ -16,11 +17,11 @@ namespace WheresGarryMultiplayerMockup
     {
         public static LemonAction onSceneCached;
         public static Controller controller;
-        public static GameObject[] enemies => GameObject.FindGameObjectsWithTag("Enemy");
-        public static List<Error> errors = new();
-        public static List<Server> servers = new();
+        public static Error[] errors;
+        public static Server[] servers;
         public override void OnInitializeMelon()
         {
+            Message.MaxPayloadSize = ushort.MaxValue;
             onSceneCached += OnSceneCached;
             LoggerInstance.Msg("Initialized.");
             HarmonyInstance.PatchAll();
@@ -45,8 +46,8 @@ namespace WheresGarryMultiplayerMockup
 
         private void OnSceneCached()
         {
-            errors.Clear();
-            servers.Clear();
+            errors = GameObject.FindObjectsByType<Error>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID);
+            servers = GameObject.FindObjectsByType<Server>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID);
         }
 
         private void Update()

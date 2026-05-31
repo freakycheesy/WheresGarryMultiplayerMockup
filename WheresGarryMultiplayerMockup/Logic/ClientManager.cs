@@ -10,6 +10,7 @@ namespace WheresGarryMultiplayerMockup.Logic
 {
     public static class ClientManager
     {
+        public static bool isDead = false;
         public static Player localPlayer => Core.controller.player;
         public static Dictionary<ushort, GameObject> players = new Dictionary<ushort, GameObject>();
         public static void Start()
@@ -25,6 +26,7 @@ namespace WheresGarryMultiplayerMockup.Logic
 
         private static void OnSceneCached()
         {
+            isDead = false;
             players.Clear();
         }
 
@@ -86,6 +88,7 @@ namespace WheresGarryMultiplayerMockup.Logic
             if (NetworkManager.isServer) return;
             var message = incoming.GetSerializable<ControllerStateMessage>();
         }
+        /*
         [MessageHandler((ushort)Messages.NpcState)]
         public static void NpcState(Message incoming)
         {
@@ -97,6 +100,7 @@ namespace WheresGarryMultiplayerMockup.Logic
             npc.transform.position = message.position;
             npc.transform.rotation = message.rotation;
         }
+        */
         [MessageHandler((ushort)Messages.FixError)]
         public static void HandleFixError(Message incoming)
         {
